@@ -1,9 +1,26 @@
 # This is a sample Python script.
+import random
+import string
+
+import Levenshtein
 import cv2
 import numpy as np
+import pytesseract
+from PIL import Image
 
 
 # todo check https://stackoverflow.com/questions/70300189/how-to-keep-only-black-color-text-in-the-image-using-opencv-python
+
+def findMatch(known, text):
+    found = [f.lower() for f in text.split() if len(f) >= 3]
+    for k in known:
+        distances = []
+        for i in range(0, min(len(k), len(found))):
+            if len(found[i]) >= 3:
+                distances.append(Levenshtein.distance(k[i].lower(), found[i].lower()))
+        if all(x <= 3 for x in distances):
+            print(f"{k} matches {found}")
+
 
 def areaFilter(minArea, inputImage):
     # Perform an area filter on the binary blobs:
@@ -47,13 +64,14 @@ def findSpeakerNameCoordinates():
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         # if 700 < y < 720 and x < 680:
-        if 40 < w < 55 and 7 < h < 20:
+        if 40 < w < 100 and 7 < h < 50:
             candidateContours.append(c)
             nameBoxCoordinates.append((x, y, w, h))
     image_copy = img.copy()
     # cv2.drawContours(image_copy, candidateContours, -1, (0, 255, 0), 2)
     # cv2.imshow('candidateContours', image_copy)
     return nameBoxCoordinates
+
 
 def findSpeakingIndicatorCoordinates():
     image_copy = img.copy()
@@ -100,39 +118,35 @@ def findSpeakingIndicatorCoordinates():
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    img = cv2.imread('jannikSpeaking1200.png')
+    img = cv2.imread('jannikSpeaking.png')
 
-    # imgFloat = img.astype("float") / 255.
-    #
-    # # Calculate channel K:
-    # kChannel = 1 - np.max(imgFloat, axis=2)
-    #
-    # # Convert back to uint 8:
-    # kChannel = (255 * kChannel).astype(np.uint8)
-    # cv2.imshow("kChannel", kChannel)
-    # binaryThreshMin = 255 * 0.4
-    # binaryThreshMax = 255 * 0.41
-    # _, binaryImage = cv2.threshold(kChannel, binaryThreshMin, binaryThreshMax, cv2.THRESH_BINARY)
-    #
-    # cv2.imshow("binaryImage", cv2.bitwise_not(binaryImage))
-    # cv2.imshow('Image', img.copy())
-    # img = cv2.resize(img, (None, None), None, 0.4, 0.4)
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # img = np.array(img, dtype='float32')
-    # result = np.where(img == 0., 255, 0)
-    # result = np.array(result, dtype='uint8')
-    # result = cv2.erode(result, kernel=np.ones(shape=(3, 3)), iterations=1)
-    # cv2.imshow('Image', img)
+    pytesseract.pytesseract.tesseract_cmd = r'c:\Program Files\Tesseract-OCR\tesseract.exe'
+    strings = []
+
+    known = [["Jannik", "Schick"],
+             [u"Jörn", "Hauke"],
+             ["Hauke", "Plambeck"],
+             ["Hauke", u"Schäfer"],
+             ["Axel", "Miller"],
+             ["Axel", "Dehning"],
+             ]
 
     nameBoxCoordinates = findSpeakerNameCoordinates()
     image_copy = img.copy()
+    count = 0
     for coordinates in nameBoxCoordinates:
-        cv2.rectangle(image_copy, (coordinates[0], coordinates[1]), (coordinates[0] + coordinates[2], coordinates[1] + coordinates[3]), (0, 255, 0), 2)
+        cv2.rectangle(image_copy, (coordinates[0], coordinates[1]),
+                      (coordinates[0] + coordinates[2], coordinates[1] + coordinates[3]), (0, 255, 0), 2)
+        x, y, w, h = coordinates[0], coordinates[1], coordinates[2], coordinates[3],
+        nameBoxImage = img[y:y + h, x:x + w]
+        name = pytesseract.image_to_string(nameBoxImage)
+        cv2.imwrite(f"namebox{count}.jpg", nameBoxImage)
+        count += 1
+        print(name)
+        cv2.imshow(''.join(random.choice(string.ascii_letters) for i in range(10)), nameBoxImage)
 
     cv2.imshow('Name boxes', image_copy)
 
     cv2.waitKey(0)
 
     cv2.destroyAllWindows()
-
-
