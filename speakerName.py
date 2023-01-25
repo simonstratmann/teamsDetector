@@ -38,7 +38,7 @@ def areaFilter(minArea, inputImage):
     return filteredImage
 
 
-def findSpeakerNameCoordinates():
+def findSpeakerNameCoordinates(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     _, bw_copy = cv2.threshold(gray, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
@@ -68,19 +68,19 @@ def findSpeakerNameCoordinates():
             candidateContours.append(c)
             nameBoxCoordinates.append((x, y, w, h))
     image_copy = img.copy()
-    # cv2.drawContours(image_copy, candidateContours, -1, (0, 255, 0), 2)
-    # cv2.imshow('candidateContours', image_copy)
+    cv2.drawContours(image_copy, candidateContours, -1, (0, 255, 0), 2)
+    cv2.imshow('candidateContours', image_copy)
     return nameBoxCoordinates
 
 
-def findSpeakingIndicatorCoordinates():
+def findSpeakingIndicatorCoordinates(img):
     image_copy = img.copy()
     hsvImage = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     # Create the HSV mask
-    lowerValues = np.array([15, 118, 211])
-    upperValues = np.array([21, 186, 255])
+    lowerValues = np.array([96, 65, 210])
+    upperValues = np.array([121, 125, 247])
     hsvMask = cv2.inRange(hsvImage, lowerValues, upperValues)
-    cv2.imshow("hsvMask", hsvMask)
+    # cv2.imshow("hsvMask", hsvMask)
     # cv2.imshow("Image", hsvImage)
     minArea = 50
     cleanedMask = areaFilter(minArea, hsvMask)
@@ -111,8 +111,8 @@ def findSpeakingIndicatorCoordinates():
             rectHeight = boundRect[3]
             indicatorCoordinateTuples.append((rectX, rectY, rectWidth, rectHeight))
     cv2.drawContours(image_copy, indicatorContours, -1, (0, 255, 0), 2)
-    cv2.imshow("cleanedMask", cleanedMask)
-    cv2.imshow("cleanedMaskContours", image_copy)
+    # cv2.imshow("cleanedMask", cleanedMask)
+    # cv2.imshow("cleanedMaskContours", image_copy)
     return indicatorCoordinateTuples
 
 
@@ -131,21 +131,28 @@ if __name__ == '__main__':
              ["Axel", "Dehning"],
              ]
 
-    nameBoxCoordinates = findSpeakerNameCoordinates()
-    image_copy = img.copy()
-    count = 0
-    for coordinates in nameBoxCoordinates:
-        cv2.rectangle(image_copy, (coordinates[0], coordinates[1]),
-                      (coordinates[0] + coordinates[2], coordinates[1] + coordinates[3]), (0, 255, 0), 2)
-        x, y, w, h = coordinates[0], coordinates[1], coordinates[2], coordinates[3],
-        nameBoxImage = img[y:y + h, x:x + w]
-        name = pytesseract.image_to_string(nameBoxImage)
-        cv2.imwrite(f"namebox{count}.jpg", nameBoxImage)
-        count += 1
-        print(name)
-        cv2.imshow(''.join(random.choice(string.ascii_letters) for i in range(10)), nameBoxImage)
+    speakingCoordinators = findSpeakingIndicatorCoordinates(img)
+    if len(speakingCoordinators) == 1:  # todo multiple speakers
+        x, y, w, h = speakingCoordinators[0][0], speakingCoordinators[0][1], speakingCoordinators[0][2], \
+        speakingCoordinators[0][3]
+        speakerBox = img[y:y + h, x:x + w]
+        cv2.imshow("speaker box", speakerBox)
 
-    cv2.imshow('Name boxes', image_copy)
+        nameBoxCoordinates = findSpeakerNameCoordinates(speakerBox)
+        image_copy = speakerBox.copy()
+        count = 0
+        for coordinates in nameBoxCoordinates:
+            cv2.rectangle(speakerBox, (coordinates[0], coordinates[1]),
+                          (coordinates[0] + coordinates[2], coordinates[1] + coordinates[3]), (0, 255, 0), 2)
+            x, y, w, h = coordinates[0], coordinates[1], coordinates[2], coordinates[3],
+            nameBoxImage = speakerBox[y:y + h, x:x + w]
+            name = pytesseract.image_to_string(nameBoxImage)
+            cv2.imwrite(f"namebox{count}.jpg", nameBoxImage)
+            count += 1
+            print(name)
+            cv2.imshow(''.join(random.choice(string.ascii_letters) for i in range(10)), nameBoxImage)
+
+    # cv2.imshow('Name boxes', image_copy)
 
     cv2.waitKey(0)
 
