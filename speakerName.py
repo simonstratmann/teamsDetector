@@ -54,7 +54,7 @@ def findSpeakerNameCoordinates(img):
     # morphological gradient calculation
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     grad = cv2.morphologyEx(blur, cv2.MORPH_GRADIENT, kernel)
-    # cv2.imshow('grad', grad)
+    cv2.imshow('grad', grad)
 
     # binarization
     _, bw = cv2.threshold(grad, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
@@ -70,12 +70,12 @@ def findSpeakerNameCoordinates(img):
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         # if 700 < y < 720 and x < 680:
-        if 40 < w < 100 and 7 < h < 50:
+        if 40 < w < 150 and 7 < h < 50:
             candidateContours.append(c)
             nameBoxCoordinates.append((x, y, w, h))
     image_copy = img.copy()
-    cv2.drawContours(image_copy, contours, -1, (0, 255, 0), 2)
-    cv2.imshow('contours', image_copy)
+    # cv2.drawContours(image_copy, candidateContours, -1, (0, 255, 0), 2)
+    # cv2.imshow('candidateContours', image_copy)
     return nameBoxCoordinates
 
 
@@ -101,25 +101,45 @@ def findSpeakingIndicatorCoordinates(img):
     cleanedMask = cv2.morphologyEx(cleanedMask, cv2.MORPH_ERODE, structuringElement, None, None, iterations,
                                    cv2.BORDER_REFLECT101)
     contours, _ = cv2.findContours(cleanedMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    indicatorContours = []
+    approxContours = []
     indicatorCoordinateTuples = []
+    boundingBoxes = []
+    approxContoursImg = img.copy()
+    boundingBoxesImg = img.copy()
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         if cv2.contourArea(c) > 1000:
-            indicatorContours.append(c)
             contoursPoly = cv2.approxPolyDP(c, 3, True)
+            approxContours.append(contoursPoly)
 
             # Convert the polygon to a bounding rectangle:
             boundRect = cv2.boundingRect(contoursPoly)
+            boundingBoxes.append(boundRect)
 
             # Get the bounding rect's data:
-            rectX = boundRect[0]
-            rectY = boundRect[1]
+            rectLeftX = boundRect[0]
+            rectTopY = boundRect[1]
             rectWidth = boundRect[2]
             rectHeight = boundRect[3]
-            indicatorCoordinateTuples.append((rectX, rectY, rectWidth, rectHeight))
-    cv2.drawContours(image_copy, contours, -1, (0, 255, 0), 2)
-    cv2.imshow("cleanedMask", image_copy)
+            isWithoutVideo = len(contoursPoly) > 10
+            # The shape of the indicator is a circle (indicated by the number of points being more than 4, but 10 to be sure) when there's no video
+            # IN that case the name of the speaker is below the circle so we set the rectangle accordingly (roughly)
+            if isWithoutVideo:
+                rectTopY = rectTopY + rectHeight
+                rectHeight = 50
+            else:
+                # The name box is in the lower part of the image
+                rectTopY = rectTopY + rectHeight - int(rectHeight * 0.1)
+                rectHeight = int(rectHeight * 0.1)
+
+            indicatorCoordinateTuples.append((rectLeftX, rectTopY, rectWidth, rectHeight))
+            cv2.rectangle(boundingBoxesImg, (rectLeftX, rectTopY),
+                          (rectLeftX + rectWidth, rectTopY + rectHeight), (0, 255, 0), 2)
+
+    cv2.drawContours(approxContoursImg, approxContours, -1, (0, 255, 0), 2)
+    cv2.imshow("approxContours", approxContoursImg)
+    # cv2.drawContours(boundingBoxesImg, boundingBoxes, -1, (0, 255, 0), 2)
+    cv2.imshow("boundingBoxesImg", boundingBoxesImg)
     # cv2.imshow("cleanedMaskContours", image_copy)
     return indicatorCoordinateTuples
 
@@ -151,19 +171,21 @@ def findCurrentSpeaker(img):
 if __name__ == '__main__':
     img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing speaker no video.png')
     img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing names.png')
-
-    pytesseract.pytesseract.tesseract_cmd = r'c:\Program Files\Tesseract-OCR\tesseract.exe'
-    strings = []
-
-    known = [["Jannik", "Schick"],
-             [u"Jörn", "Hauke"],
-             ["Hauke", "Plambeck"],
-             ["Hauke", u"Schäfer"],
-             ["Axel", "Miller"],
-             ["Axel", "Dehning"],
-             ]
-
+    img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\Meeting in jannik speaking.png')
     findSpeakingIndicatorCoordinates(img)
+
+    # pytesseract.pytesseract.tesseract_cmd = r'c:\Program Files\Tesseract-OCR\tesseract.exe'
+    # strings = []
+    #
+    # known = [["Jannik", "Schick"],
+    #          [u"Jörn", "Hauke"],
+    #          ["Hauke", "Plambeck"],
+    #          ["Hauke", u"Schäfer"],
+    #          ["Axel", "Miller"],
+    #          ["Axel", "Dehning"],
+    #          ]
+    #
+    # findSpeakingIndicatorCoordinates(img)
 
     # before = time.perf_counter()
     # for i in range(0, 1):
