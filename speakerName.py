@@ -170,9 +170,9 @@ def findCurrentSpeaker(img):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing speaker no video.png')
-    img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing names.png')
-    img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\Meeting in jannik speaking.png')
-    findSpeakingIndicatorCoordinates(img)
+    # img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing names.png')
+    # img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\Meeting in jannik speaking.png')
+    coordinates = findSpeakingIndicatorCoordinates(img)
 
     # pytesseract.pytesseract.tesseract_cmd = r'c:\Program Files\Tesseract-OCR\tesseract.exe'
     # strings = []
