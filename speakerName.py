@@ -1,11 +1,15 @@
 # This is a sample Python script.
 import random
 import string
+import time
 
 import Levenshtein
 import cv2
 import numpy as np
 import pytesseract
+import pyautogui
+import win32gui
+import win32api
 from PIL import Image
 
 
@@ -41,7 +45,8 @@ def areaFilter(minArea, inputImage):
 def findSpeakerNameCoordinates(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    _, bw_copy = cv2.threshold(gray, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # _, bw_copy = cv2.threshold(gray, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # cv2.imshow('closed', bw_copy)
 
     # bilateral filter
     blur = cv2.bilateralFilter(gray, 5, 75, 75)
@@ -49,6 +54,7 @@ def findSpeakerNameCoordinates(img):
     # morphological gradient calculation
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     grad = cv2.morphologyEx(blur, cv2.MORPH_GRADIENT, kernel)
+    # cv2.imshow('grad', grad)
 
     # binarization
     _, bw = cv2.threshold(grad, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
@@ -56,7 +62,7 @@ def findSpeakerNameCoordinates(img):
     # closing
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 1))
     closed = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel)
-    # cv2.imshow('closed', closed)
+    cv2.imshow('closed', closed)
     candidateContours = []
     contours, hierarchy = cv2.findContours(closed, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     nameBoxCoordinates = []
@@ -68,8 +74,8 @@ def findSpeakerNameCoordinates(img):
             candidateContours.append(c)
             nameBoxCoordinates.append((x, y, w, h))
     image_copy = img.copy()
-    cv2.drawContours(image_copy, candidateContours, -1, (0, 255, 0), 2)
-    cv2.imshow('candidateContours', image_copy)
+    cv2.drawContours(image_copy, contours, -1, (0, 255, 0), 2)
+    cv2.imshow('contours', image_copy)
     return nameBoxCoordinates
 
 
@@ -83,7 +89,9 @@ def findSpeakingIndicatorCoordinates(img):
     # cv2.imshow("hsvMask", hsvMask)
     # cv2.imshow("Image", hsvImage)
     minArea = 50
-    cleanedMask = areaFilter(minArea, hsvMask)
+    # cleanedMask = areaFilter(minArea, hsvMask)
+    # todo seems to work without areaFilter
+    cleanedMask = hsvMask
     # Pre-process mask:
     kernelSize = 3
     structuringElement = cv2.getStructuringElement(cv2.MORPH_RECT, (kernelSize, kernelSize))
@@ -110,15 +118,39 @@ def findSpeakingIndicatorCoordinates(img):
             rectWidth = boundRect[2]
             rectHeight = boundRect[3]
             indicatorCoordinateTuples.append((rectX, rectY, rectWidth, rectHeight))
-    cv2.drawContours(image_copy, indicatorContours, -1, (0, 255, 0), 2)
-    # cv2.imshow("cleanedMask", cleanedMask)
+    cv2.drawContours(image_copy, contours, -1, (0, 255, 0), 2)
+    cv2.imshow("cleanedMask", image_copy)
     # cv2.imshow("cleanedMaskContours", image_copy)
     return indicatorCoordinateTuples
 
 
+def findCurrentSpeaker(img):
+    speakingCoordinators = findSpeakingIndicatorCoordinates(img)
+    if len(speakingCoordinators) == 1:  # todo multiple speakers
+        x, y, w, h = speakingCoordinators[0][0], speakingCoordinators[0][1], speakingCoordinators[0][2], \
+            speakingCoordinators[0][3]
+        speakerBox = img.copy()[y:y + h, x:x + w]
+        # cv2.imshow("speaker box", speakerBox)
+
+        nameBoxCoordinates = findSpeakerNameCoordinates(speakerBox)
+        count = 0
+        for coordinates in nameBoxCoordinates:
+            cv2.rectangle(speakerBox, (coordinates[0], coordinates[1]),
+                          (coordinates[0] + coordinates[2], coordinates[1] + coordinates[3]), (0, 255, 0), 2)
+            x, y, w, h = coordinates[0], coordinates[1], coordinates[2], coordinates[3],
+            nameBoxImage = speakerBox[y:y + h, x:x + w]
+            name = pytesseract.image_to_string(nameBoxImage)
+            cv2.imwrite(f"namebox{count}.jpg", nameBoxImage)
+            count += 1
+            # print(name)
+            # cv2.imshow(''.join(random.choice(string.ascii_letters) for i in range(10)), nameBoxImage)
+            return name
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    img = cv2.imread('jannikSpeaking.png')
+    img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing speaker no video.png')
+    img = cv2.imread(r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing names.png')
 
     pytesseract.pytesseract.tesseract_cmd = r'c:\Program Files\Tesseract-OCR\tesseract.exe'
     strings = []
@@ -131,26 +163,27 @@ if __name__ == '__main__':
              ["Axel", "Dehning"],
              ]
 
-    speakingCoordinators = findSpeakingIndicatorCoordinates(img)
-    if len(speakingCoordinators) == 1:  # todo multiple speakers
-        x, y, w, h = speakingCoordinators[0][0], speakingCoordinators[0][1], speakingCoordinators[0][2], \
-        speakingCoordinators[0][3]
-        speakerBox = img[y:y + h, x:x + w]
-        cv2.imshow("speaker box", speakerBox)
+    findSpeakingIndicatorCoordinates(img)
 
-        nameBoxCoordinates = findSpeakerNameCoordinates(speakerBox)
-        image_copy = speakerBox.copy()
-        count = 0
-        for coordinates in nameBoxCoordinates:
-            cv2.rectangle(speakerBox, (coordinates[0], coordinates[1]),
-                          (coordinates[0] + coordinates[2], coordinates[1] + coordinates[3]), (0, 255, 0), 2)
-            x, y, w, h = coordinates[0], coordinates[1], coordinates[2], coordinates[3],
-            nameBoxImage = speakerBox[y:y + h, x:x + w]
-            name = pytesseract.image_to_string(nameBoxImage)
-            cv2.imwrite(f"namebox{count}.jpg", nameBoxImage)
-            count += 1
-            print(name)
-            cv2.imshow(''.join(random.choice(string.ascii_letters) for i in range(10)), nameBoxImage)
+    # before = time.perf_counter()
+    # for i in range(0, 1):
+    #     speakerName = findCurrentSpeaker(img)
+    #     print(speakerName)
+    # print(f"Took: {time.perf_counter()-before}")
+    # windowHandle = None
+
+    # def handler(handle, argument):
+    #     if "Meeting in" in win32gui.GetWindowText(handle):
+    #         global windowHandle
+    #         windowHandle = handle
+    #
+    #
+    # win32gui.EnumWindows(handler, None)
+    # monitorHandle = win32api.MonitorFromWindow(windowHandle)
+    # monitorInfo = win32api.GetMonitorInfo(monitorHandle)
+    # displaySettings = win32api.EnumDisplaySettings(monitorInfo["Device"])
+    # scalingFactor = displaySettings.
+    # print(windowHandle)
 
     # cv2.imshow('Name boxes', image_copy)
 
