@@ -27,51 +27,42 @@ def findMatch(known, text):
             print(f"{k} matches {found}")
 
 
-def areaFilter(minArea, inputImage):
-    # Perform an area filter on the binary blobs:
-    componentsNumber, labeledImage, componentStats, componentCentroids = \
-        cv2.connectedComponentsWithStats(inputImage, connectivity=4)
-
-    # Get the indices/labels of the remaining components based on the area stat
-    # (skip the background component at index 0)
-    remainingComponentLabels = [i for i in range(1, componentsNumber) if componentStats[i][4] >= minArea]
-
-    # Filter the labeled pixels based on the remaining labels,
-    # assign pixel intensity to 255 (uint8) for the remaining pixels
-    filteredImage = np.where(np.isin(labeledImage, remainingComponentLabels) == True, 255, 0).astype('uint8')
-
-    return filteredImage
-
-
 def findSpeakerNameCoordinates(img):
+    # Convert to gray
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # _, bw_copy = cv2.threshold(gray, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    # cv2.imshow('closed', bw_copy)
 
     # bilateral filter
     blur = cv2.bilateralFilter(gray, 5, 75, 75)
+    cv2.imshow("py blur", blur)
 
     # morphological gradient calculation
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     grad = cv2.morphologyEx(blur, cv2.MORPH_GRADIENT, kernel)
+    # cv2.imshow("py grad", grad)
 
     # binarization
-    _, bw = cv2.threshold(grad, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    _, bw = cv2.threshold(grad, 0.0, 255.0, cv2.THRESH_OTSU)
+    cv2.imshow("py bw", bw)
 
     # closing
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 1))
     closed = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel)
+    # cv2.imshow("py closed", closed)
     candidateContours = []
     contours, hierarchy = cv2.findContours(closed, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     nameBoxCoordinates = []
+
+    image_copy = img.copy()
+    cv2.drawContours(image_copy, contours, -1, (255, 0, 0), 1)
 
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         # if 700 < y < 720 and x < 680:
         if 40 < w < 150 and 7 < h < 50:
+            cv2.drawContours(image_copy, [c], -1, (0, 255, 0), 1)
             candidateContours.append(c)
             nameBoxCoordinates.append((x, y, w, h))
+    cv2.imshow("py contours", image_copy)
     return nameBoxCoordinates
 
 
@@ -108,24 +99,24 @@ def findSpeakingIndicatorCoordinates(img):
             boundingBoxes.append(boundRect)
 
             # Get the bounding rect's data:
-            rectLeftX = boundRect[0]
-            rectTopY = boundRect[1]
+            rectX = boundRect[0]
+            rectY = boundRect[1]
             rectWidth = boundRect[2]
             rectHeight = boundRect[3]
             isWithoutVideo = len(contoursPoly) > 10
             # The shape of the indicator is a circle (indicated by the number of points being more than 4, but 10 to be sure) when there's no video
             # IN that case the name of the speaker is below the circle so we set the rectangle accordingly (roughly)
             if isWithoutVideo:
-                rectTopY = rectTopY + rectHeight
+                rectY = rectY + rectHeight
                 rectHeight = 50
             else:
                 # The name box is in the lower part of the image
-                rectTopY = rectTopY + rectHeight - int(rectHeight * 0.1)
+                rectY = rectY + rectHeight - int(rectHeight * 0.1)
                 rectHeight = int(rectHeight * 0.1)
 
-            indicatorCoordinateTuples.append((rectLeftX, rectTopY, rectWidth, rectHeight))
-            cv2.rectangle(boundingBoxesImg, (rectLeftX, rectTopY),
-                          (rectLeftX + rectWidth, rectTopY + rectHeight), (0, 255, 0), 2)
+            indicatorCoordinateTuples.append((rectX, rectY, rectWidth, rectHeight))
+            cv2.rectangle(boundingBoxesImg, (rectX, rectY),
+                          (rectX + rectWidth, rectY + rectHeight), (0, 255, 0), 2)
 
     cv2.drawContours(approxContoursImg, approxContours, -1, (0, 255, 0), 2)
     return indicatorCoordinateTuples
@@ -160,10 +151,9 @@ def getSpeakerName(imagepath):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    imagepath = r'C:\Users\strat\PycharmProjects\teamsDetector\teamscall sharing speaker no video.png'
+    imagepath = r'C:\Users\strat\PycharmProjects\teamsDetector\jannikspeaking.png'
     name = getSpeakerName(imagepath)
     print(name)
 
     cv2.waitKey(0)
-
     cv2.destroyAllWindows()
