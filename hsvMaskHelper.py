@@ -7,7 +7,7 @@ def nothing(x):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    img = cv2.imread('jannikSpeaking1200.png')
+    img = cv2.imread('teamscall sharing names.png')
 
 
     cv2.namedWindow('image')
