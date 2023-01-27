@@ -21,40 +21,35 @@ if __name__ == '__main__':
     pytesseract.pytesseract.tesseract_cmd = r'c:\Program Files\Tesseract-OCR\tesseract.exe'
     for path in fullBoxes:
         img = cv2.imread(path)
+        # Convert to HSV
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # Create mask
         lower = np.array([0, 0, 183])
         upper = np.array([174, 7, 255])
         mask = cv2.inRange(hsv, lower, upper)
+
+        # Dilate
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 3))
         dilate = cv2.dilate(mask, kernel, iterations=5)
-        # cv2.imshow("dilate", dilate)
 
-        # Find contours and filter using aspect ratio
-        # Remove non-text contours by filling in the contour
+        # Find contours
         cnts = cv2.findContours(dilate, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         cnts = cnts[0] if len(cnts) == 2 else cnts[1]
 
-        # cv2.drawContours(dilate, cnts, -1, (255, 0, 0), 1)
-        inverted = cv2.bitwise_not(img)
-        # cv2.drawContours(inverted, cnts, -1, (255, 0, 0), 1)
         x, y, w, h = cv2.boundingRect(cnts[0])
+
+        # Invert original image
+        inverted = cv2.bitwise_not(img)
+
+        cv2.imshow("inverted", inverted)
+        # Crop inverted image
         namebox = inverted[y:y + h, x:x + w]
-        # cv2.imshow("inverted", inverted)
-        # cv2.imshow("namebox", namebox)
+        cv2.imshow("namebox", namebox)
 
-        gray = cv2.cvtColor(inverted, cv2.COLOR_BGR2GRAY)
-        _, bw = cv2.threshold(gray, 150.0, 255.0, cv2.THRESH_OTSU)
-        nameboxbw = bw[y:y + h, x:x + w]
-        # cv2.imshow("nameboxbw", nameboxbw)
-
-        # Dean works with cropped and inverted and psm > 7
-
-        i = 13
-        # name = pytesseract.image_to_string(cv2.imread("fullBoxDeanCroppedInverted.png"), config='-l deu --psm ' + str(i))
-        # print(f"{i}: {name}")
-
-        name = pytesseract.image_to_string(namebox, config='-l deu --psm ' + str(i))
-        print(f"{path}: {name}")
+        name = pytesseract.image_to_string(namebox, config='-l deu --psm 12')
+        print(f"{path} modified: {name}")
+        name = pytesseract.image_to_string(img, config='-l deu --psm 12')
+        print(f"{path} original: {name}")
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
